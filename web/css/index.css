@@ -1,0 +1,50 @@
+html {
+  min-width: 600px;
+  min-height: 700px;
+}
+body {
+  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial,
+    sans-serif;
+  background-color: #f0f2f5;
+}
+.container {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+.el-form-item__label {
+  font-weight: 500;
+}
+
+.el-checkbox-group {
+  display: flex;
+  flex-direction: row;
+  gap: 20px; /* 调整水平间距 */
+}
+
+.el-button-group .el-button--primary:first-child {
+  border-right-color: lightgray;
+}
+
+.el-button-group .el-button--primary:last-child {
+  border-left-color: lightgray;
+}
+
+.el-button-group .el-button--primary:not(:first-child):not(:last-child) {
+  border-left-color: lightgray;
+  border-right-color: lightgray;
+}
+.card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  min-height: 30px;
+}
+.el-text {
+  white-space: pre-wrap; /* 保留空白符和换行符 */
+}
+.el-scrollbar {
+  width: 100%;
+}

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyinstallerGUI</title>
+    <link rel="stylesheet" href="css/element-plus.css">
+    <link rel="stylesheet" href="css/index.css">
+    <link rel="icon" href="favicon.ico">
+
+</head>
+
+<body>
+    <div class="container">
+        <el-form ref="formRef" :label-width="labelWidth + 'px'">
+            <el-form-item label="Python 脚本">
+                <el-input v-model="form.scriptPath" placeholder="选择 Python 脚本">
+                    <template #append>
+                        <el-button @click="openFile('script')">浏览</el-button>
+                    </template>
+                </el-input>
+            </el-form-item>
+
+            <el-form-item label="输出目录">
+                <el-input v-model="form.outputDir" placeholder="选择输出目录">
+                    <template #append>
+                        <el-button @click="openFolder('output')">浏览</el-button>
+                    </template>
+                </el-input>
+            </el-form-item>
+
+            <el-form-item label="图标 (可选)">
+                <el-input v-model="form.iconPath" placeholder="选择图标文件">
+                    <template #append>
+                        <el-button @click="openFile('icon')">浏览</el-button>
+                    </template>
+                </el-input>
+            </el-form-item>
+
+            <el-form-item label="打包选项">
+                <el-checkbox-group v-model="form.options">
+                    <el-checkbox label="onefile">单文件模式</el-checkbox>
+                    <el-checkbox label="windowed">窗口模式</el-checkbox>
+                    <el-checkbox label="noconfirm">跳过确认</el-checkbox>
+                </el-checkbox-group>
+            </el-form-item>
+            <el-form-item label="附加文件">
+                <el-input v-model="form.additionalFiles" placeholder="多个文件用逗号分隔">
+                    <template #append>
+                        <el-button-group>
+                            <el-button type="primary" @click="openFile('additional')">文件</el-button>
+                            <el-button type="primary" @click="openFolder('additional')">目录</el-button>
+                        </el-button-group>
+                    </template>
+                </el-input>
+            </el-form-item>
+            <el-form-item label="排除依赖">
+                <el-input v-model="form.excludeDependencies" placeholder="多个依赖用逗号分隔"></el-input>
+            </el-form-item>
+            <el-form-item label="其他参数">
+                <el-input v-model="form.otherParams" placeholder="输入其他未提供的选项参数"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" @click="startBuild()" block style="width: 100%">开始打包</el-button>
+            </el-form-item>
+        </el-form>
+
+        <el-card body-class="card" header-class="card" shadow="hover">
+            <template #header>
+                <span>命令预览</span>
+                <el-button type="success" bg text @click="copyCommand">复制</el-button>
+            </template>
+            <el-scrollbar height="55px">
+                <el-text class="mx-1" size="small" type="success">{{ commandPreview }}</el-text>
+            </el-scrollbar>
+        </el-card>
+        <el-card body-class="card" header-class="card" shadow="hover">
+            <template #header>
+                <span>输出日志</span>
+            </template>
+            <el-scrollbar height="60px" ref="logScrollbar">
+                <el-text class="mx-1" size="small" type="info">{{ logOutput }}</el-text>
+            </el-scrollbar>
+        </el-card>
+    </div>
+
+    <script src="js/vue.global.prod.js"></script>
+    <script src="js/element-plus.full.min.js"></script>
+    <script>
+        const { createApp } = Vue
+        const { ElMessage } = ElementPlus
+
+        createApp({
+            data() {
+                return {
+                    form: {
+                        scriptPath: '',
+                        outputDir: '',
+                        iconPath: '',
+                        options: ['noconfirm', 'onefile', 'windowed'],
+                        additionalFiles: '',
+                        otherParams: '',
+                        excludeDependencies: ''
+                    },
+                    scriptDir: '',
+                    commandPreview: 'pyinstaller',
+                    logOutput: '启动成功' + '\n' + '-----------------------' + '\n',
+                    labelWidth: 100 // 初始化标签宽度
+                }
+            },
+            mounted() {
+                this.updateCommandPreview()
+                window.appendLog = (log) => {
+                    this.logOutput += decodeURIComponent(log) + '\n'
+                    this.scrollToBottom()
+                }
+            },
+            watch: {
+                'form': {
+                    handler: 'updateCommandPreview',
+                    deep: true
+                }
+            },
+            methods: {
+                updateCommandPreview() {
+                    let command = 'pyinstaller'
+
+
+                    if (this.form.scriptPath) {
+                        command += ` "${this.form.scriptPath}"`
+                    }
+
+                    if (this.form.options.includes('onefile')) {
+                        command += ' --onefile'
+                    }
+
+                    if (this.form.options.includes('windowed')) {
+                        command += ' --windowed'
+                    }
+
+                    if (this.form.options.includes('noconfirm')) {
+                        command += ' --noconfirm'
+                    }
+                    if (this.form.iconPath) {
+                        command += ` --icon "${this.form.iconPath}"`
+                    }
+
+                    if (this.form.outputDir) {
+                        command += ` --distpath "${this.form.outputDir}"`
+                    }
+
+                    const additionalFiles = this.form.additionalFiles.split(',').map(f => f.trim()).filter(f => f);
+                    additionalFiles.forEach(file => {
+                        // 提取文件所在目录
+                        let lastSlashIndex = file.lastIndexOf('\\');
+                        let dirName = lastSlashIndex !== -1 ? file.substring(lastSlashIndex + 1) : '.';
+                        lastSlashIndex = dirName.lastIndexOf('.');
+                        dirName = lastSlashIndex !== -1 ? '.' : dirName;
+                        command += ` --add-data "${file};${dirName}"`;
+                    });
+
+                    const excludeDependencies = this.form.excludeDependencies.split(',').map(dep => dep.trim()).filter(dep => dep);
+                    excludeDependencies.forEach(dep => {
+                        command += ` --exclude-module ${dep}`;
+                    });
+
+                    if (this.form.otherParams) {
+                        command += ` ${this.form.otherParams}`
+                    }
+
+                    this.commandPreview = command
+                },
+                copyCommand() {
+                    navigator.clipboard.writeText(this.commandPreview).then(() => {
+                        ElMessage.success('复制成功');
+                    }).catch(() => {
+                        ElMessage.error('复制失败');
+                    });
+                },
+                async openFolder(type) {
+                    try {
+                        let allowMultiple = false;
+                        if (type === 'additional') {
+                            allowMultiple = true;
+                        }
+                        const result = await window.pywebview.api.open_folder(allowMultiple)
+                        if (result && result.length > 0) {
+                            if (type === 'output') {
+                                this.form.outputDir = result[0]
+                            } else if (type === 'additional') {
+                                // 追加新选择的目录到已有内容后
+                                const existingFiles = this.form.additionalFiles.split(',').map(f => f.trim()).filter(f => f);
+                                const newFiles = result.filter(f => !existingFiles.includes(f));
+                                this.form.additionalFiles = [...existingFiles, ...newFiles].join(',');
+                            }
+                        }
+                    } catch (error) {
+                        ElMessage.error('文件夹选择失败')
+                        console.error('文件夹选择失败:', error)
+                    }
+                },
+                async openFile(type) {
+                    try {
+                        let allowMultiple = false;
+                        if (type === 'additional') {
+                            allowMultiple = true;
+                        }
+                        const result = await window.pywebview.api.open_file(type, allowMultiple)
+                        if (result && result.length > 0) {
+                            if (type === 'script') {
+                                this.form.scriptPath = result[0]
+                                this.scriptDir = result[0].substring(0, result[0].lastIndexOf('\\'))
+                                this.form.outputDir = `${this.scriptDir}\\dist`
+                            } else if (type === 'icon') {
+                                this.form.iconPath = result[0]
+                            } else if (type === 'additional') {
+                                // 追加新选择的文件到已有内容后
+                                const existingFiles = this.form.additionalFiles.split(',').map(f => f.trim()).filter(f => f);
+                                const newFiles = result.filter(f => !existingFiles.includes(f));
+                                this.form.additionalFiles = [...existingFiles, ...newFiles].join(',');
+                            }
+                        }
+                    } catch (error) {
+                        ElMessage.error('文件选择失败')
+                        console.error('文件选择失败:', error)
+                    }
+                },
+                async startBuild() {
+                    if (!this.form.scriptPath) {
+                        ElMessage.warning('请选择 Python 脚本')
+                        return
+                    }
+
+                    this.logOutput = '开始打包...\n'
+
+                    try {
+                        const logHandler = (log) => {
+                            this.logOutput += log + '\n'
+                        }
+
+                        const result = await window.pywebview.api.start_build(
+                            this.commandPreview
+                        )
+
+                        ElMessage.success('打包成功')
+                    } catch (error) {
+                        this.logOutput += `打包失败: ${error.message}`
+                        ElMessage.error('打包失败')
+                    }
+                },
+                scrollToBottom() {
+                    this.$nextTick(() => {
+                        const scrollbar = this.$refs.logScrollbar
+                        if (scrollbar) {
+                            const wrap = scrollbar.$el.querySelector('.el-scrollbar__wrap')
+                            if (wrap) {
+                                wrap.scrollTop = wrap.scrollHeight
+                            }
+                        }
+                    })
+                }
+            }
+        }).use(ElementPlus).mount('body')
+    </script>
+</body>
+
+</html>
